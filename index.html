@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>可愛跑馬燈控制中心 - 專業分享版</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; overflow: hidden; background-color: #ffffff; margin: 0; padding: 0; transition: background-color 0.5s ease; }
+        .cute-font { font-family: 'ZCOOL KuaiLe', cursive; }
+        
+        /* 跑馬燈動畫 */
+        @keyframes marquee {
+            0% { transform: translateX(100vw); }
+            100% { transform: translateX(-100%); }
+        }
+        
+        .marquee-item {
+            position: absolute; white-space: nowrap; will-change: transform; pointer-events: none;
+            display: flex; align-items: center; line-height: 1;
+            filter: drop-shadow(4px 4px 0px rgba(0,0,0,0.05));
+            z-index: 5;
+        }
+
+        /* 圖卡容器：格狀排列且不消失 */
+        .card-grid-container {
+            height: 100vh; overflow-y: auto; padding: 100px 40px 100px 40px;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px; align-content: start;
+        }
+
+        .card-item {
+            background: white; border-radius: 2.5rem; padding: 2rem;
+            box-shadow: 0 15px 35px -5px rgba(0,0,0,0.1);
+            border: 8px solid currentColor; text-align: center;
+            animation: pop-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            display: flex; align-items: center; justify-content: center; min-height: 150px;
+            word-break: break-all;
+        }
+
+        @keyframes pop-in {
+            0% { opacity: 0; transform: scale(0.5); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .status-pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+        
+        /* 模式按鈕美化 */
+        .mode-btn { 
+            @apply flex flex-col items-center justify-center p-4 rounded-[2rem] border-4 transition-all duration-300 w-32 h-32;
+            background: linear-gradient(145deg, #ffffff, #f9fafb);
+            box-shadow: 8px 8px 16px #e5e7eb, -8px -8px 16px #ffffff;
+        }
+        .mode-btn.active { 
+            @apply border-pink-400 scale-105;
+            background: linear-gradient(145deg, #fce7f3, #fdf2f8);
+            box-shadow: inset 4px 4px 8px #fbcfe8, inset -4px -4px 8px #ffffff, 0 10px 20px -5px rgba(236, 72, 153, 0.3);
+        }
+        
+        #sendBtn:active { transform: scale(0.95); }
+        #sendBtn:disabled { background-color: #fce7f3; cursor: not-allowed; filter: grayscale(1); }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); }
+        ::-webkit-scrollbar-thumb { background: #fce7f3; border-radius: 10px; }
+
+        .shortener-btn {
+            padding: 0.75rem 1rem; border-radius: 1.25rem; border: 3px solid #e0e7ff;
+            background: white; font-weight: 700; font-size: 0.85rem; color: #374151;
+            transition: all 0.2s; text-align: center; cursor: pointer; line-height: 1.4;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .shortener-btn:hover { border-color: #93c5fd; background: #eff6ff; }
+        .active-shortener {
+            border-color: #3b82f6 !important; background: linear-gradient(145deg, #dbeafe, #eff6ff) !important;
+            box-shadow: 0 4px 14px -2px rgba(59,130,246,0.3) !important; color: #1d4ed8 !important;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen">
+
+    <!-- 教師主畫面 -->
+    <div id="teacherView" class="relative w-full h-full">
+        <!-- 跑馬燈/圖卡展示容器 -->
+        <div id="displayContainer" class="w-full h-full relative"></div>
+
+        <!-- 初始啟動區 -->
+        <div id="quickStartZone" class="absolute inset-0 flex items-center justify-center bg-white/95 backdrop-blur-xl z-[100]">
+            <div class="bg-white p-14 rounded-[4.5rem] shadow-2xl border-4 border-pink-50 max-w-2xl w-full mx-4 text-center">
+                <h2 class="cute-font text-6xl text-pink-500 mb-8">選擇展示模式 ✨</h2>
+                <div class="flex justify-center gap-8 mb-10">
+                    <button onclick="setDisplayMode('marquee')" id="start-btn-marquee" class="mode-btn active">
+                        <span class="text-4xl mb-2">🏃‍♂️</span>
+                        <span class="font-bold text-gray-700">跑馬燈</span>
+                    </button>
+                    <button onclick="setDisplayMode('card')" id="start-btn-card" class="mode-btn">
+                        <span class="text-4xl mb-2">🖼️</span>
+                        <span class="font-bold text-gray-700">圖卡牆</span>
+                    </button>
+                </div>
+                
+                <div class="relative mb-8">
+                    <input type="text" id="quickGasUrl" placeholder="在此貼上您的 GAS Web App 網址..." 
+                        class="w-full px-8 py-5 bg-pink-50 border-4 border-pink-100 rounded-3xl outline-none focus:border-pink-400 transition-all text-center text-lg shadow-inner">
+                    <button onclick="toggleGasHelp('quickGasHelp')" class="absolute right-4 top-1/2 transform -translate-y-1/2 text-pink-400 hover:text-pink-600 bg-white rounded-full p-2 shadow-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </button>
+                </div>
+
+                <div id="quickGasHelp" class="hidden text-left bg-pink-50/50 p-6 rounded-3xl mb-8 border-2 border-pink-100 text-sm text-gray-600">
+                    <p class="font-bold text-pink-500 mb-2">🚀 如何設定 GAS：</p>
+                    <ol class="list-decimal pl-5 mb-4 space-y-1">
+                        <li>前往 <a href="https://script.google.com/" target="_blank" class="text-blue-500 underline">Google Apps Script</a> 建立新專案</li>
+                        <li>點擊下方按鈕複製程式碼，並貼上覆蓋預設的 <code>myFunction</code></li>
+                        <li>點擊右上角「部署」>「新部署」</li>
+                        <li>選取類型為「網頁應用程式」</li>
+                        <li>將「誰有權存取」設定為「任何人」</li>
+                        <li>部署完成後，複製「網頁應用程式網址」並貼回上方</li>
+                    </ol>
+                    <button onclick="copyGasCode(this)" class="w-full py-3 bg-white text-pink-500 border-2 border-pink-200 rounded-2xl font-bold hover:bg-pink-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+                        <span>📋 一鍵複製 GAS 程式碼</span>
+                    </button>
+                </div>
+
+                <button onclick="activateFromQuickStart()" class="w-full bg-pink-400 hover:bg-pink-500 text-white font-bold py-6 rounded-3xl shadow-xl transition-all text-2xl flex items-center justify-center gap-3">
+                    <span>啟動系統 🚀</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 左上方：發文與分享 -->
+        <div class="fixed top-6 left-6 z-[110] flex items-center gap-3">
+            <button onclick="switchView('student')" class="bg-pink-400 hover:bg-pink-500 text-white px-7 py-3 rounded-full shadow-lg transition-all font-bold border-2 border-white flex items-center gap-2 transform active:scale-95">
+                發文 ✨
+            </button>
+            <button id="openShare" class="bg-white hover:bg-gray-50 text-pink-400 p-3 rounded-full shadow-lg transition-all border-2 border-pink-100 flex items-center justify-center transform active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
+            </button>
+        </div>
+
+        <!-- 右上方懸浮控制面板 -->
+        <div class="fixed top-6 right-6 z-[110] flex items-center gap-4">
+            <div id="modeBadge" class="bg-white/90 backdrop-blur px-5 py-2 rounded-full border-2 border-pink-100 text-pink-500 text-xs font-black shadow-md uppercase tracking-widest">
+                模式：跑馬燈
+            </div>
+            
+            <div id="connStatus" class="flex items-center gap-2 bg-white/90 px-4 py-2 rounded-full border border-gray-100 shadow-md opacity-0 transition-opacity">
+                <span class="relative flex h-3 w-3">
+                    <span id="statusPing" class="status-pulse animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75"></span>
+                    <span id="statusDot" class="relative inline-flex rounded-full h-3 w-3 bg-gray-500"></span>
+                </span>
+                <span id="statusLabel" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">OFFLINE</span>
+            </div>
+
+            <button id="openSettings" class="bg-white/90 hover:bg-white p-3 rounded-full shadow-lg transition-all border-2 border-pink-100 text-pink-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            </button>
+        </div>
+
+        <!-- 頁尾致敬 -->
+        <div class="fixed bottom-6 right-6 z-[90] text-right">
+            <div class="bg-white/50 backdrop-blur-sm px-4 py-2 rounded-2xl border border-pink-50 inline-block shadow-sm">
+                <p class="text-xs text-gray-400 font-bold mb-1">
+                    Made by <a href="https://kentxchang.blogspot.tw" target="_blank" class="text-pink-400 hover:text-pink-600 underline transition-colors">阿剛老師</a>
+                </p>
+                <p class="text-[9px] text-gray-300 tracking-tighter leading-none">
+                    CC BY-NC-SA 4.0 姓名標示-非商業性-相同方式分享
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 學生視窗 -->
+    <div id="studentView" class="hidden fixed inset-0 z-[200] bg-pink-50 flex flex-col items-center justify-center p-6 text-center">
+        <div class="bg-white p-12 rounded-[3.5rem] shadow-2xl w-full max-w-md border-b-[15px] border-pink-200">
+            <h1 class="cute-font text-5xl text-pink-500 mb-8">想說什麼呢？ ✨</h1>
+            <input type="text" id="studentInput" placeholder="在此輸入您的文字..." maxlength="30" class="w-full px-6 py-5 rounded-3xl border-4 border-pink-50 focus:border-pink-300 outline-none text-xl mb-6 text-center shadow-inner">
+            <button id="sendBtn" class="w-full bg-pink-400 hover:bg-pink-500 text-white font-bold py-5 rounded-3xl shadow-xl text-xl transition-all flex items-center justify-center gap-2">
+                <span id="sendText">送出到螢幕 ✨</span>
+                <span id="sendLoader" class="hidden">
+                    <svg class="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                </span>
+            </button>
+            <p id="sendStatus" class="mt-4 text-pink-500 font-bold h-6"></p>
+            <button onclick="switchView('teacher')" class="mt-10 text-gray-300 underline italic text-sm">返回大螢幕</button>
+        </div>
+    </div>
+
+    <!-- 分享視窗 -->
+    <div id="shareModal" class="hidden fixed inset-0 z-[220] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-white rounded-[4rem] shadow-2xl w-full max-w-2xl p-10 text-center relative modal-active overflow-y-auto max-h-[90vh]">
+            <button id="closeShare" class="absolute top-8 right-8 text-gray-300 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            <h2 class="cute-font text-4xl text-pink-500 mb-8">分享專屬連結 ✨</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- 原始連結區 -->
+                <div class="bg-gray-50 p-6 rounded-[3rem] border-2 border-gray-100">
+                    <p class="text-pink-400 font-bold mb-4 uppercase tracking-widest text-sm">1. 原始完整連結</p>
+                    <div id="qrcode-full" class="mb-4 bg-white p-4 rounded-3xl shadow-inner inline-block"></div>
+                    <button id="copyFullLink" class="w-full py-2 text-xs bg-white border border-pink-100 text-pink-400 rounded-xl hover:bg-pink-50 transition-all font-bold">複製完整網址</button>
+                </div>
+
+                <!-- 短網址區 -->
+                <div class="bg-blue-50 p-6 rounded-[3rem] border-2 border-blue-100">
+                    <p class="text-blue-400 font-bold mb-4 uppercase tracking-widest text-sm">2. 短網址</p>
+                    <div id="qrcode-tiny" class="mb-4 bg-white p-4 rounded-3xl shadow-inner inline-block min-h-[150px] flex items-center justify-center">
+                        <span class="text-blue-300 text-xs italic">點擊分享按鈕自動生成...</span>
+                    </div>
+                    <button id="copyTinyLink" class="w-full py-2 text-xs bg-white border border-blue-100 text-blue-400 rounded-xl hover:bg-blue-50 transition-all font-bold">複製短網址</button>
+                </div>
+            </div>
+
+            <div class="mt-8 text-left bg-gray-50 p-6 rounded-3xl border border-gray-100">
+                <p class="text-[10px] text-gray-400 font-mono break-all" id="displayFullUrl"></p>
+                <p class="text-[10px] text-blue-400 font-mono mt-2 break-all" id="displayTinyUrl"></p>
+            </div>
+            
+            <p class="text-xs text-gray-400 mt-6">※ 提示：短網址與 QR Code 皆為自動生成，手機掃描「短網址」的 QR Code 通常反應更靈敏唷！</p>
+        </div>
+    </div>
+
+    <!-- 設定視窗 -->
+    <div id="settingsModal" class="hidden fixed inset-0 z-[210] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-white rounded-[4rem] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col relative">
+            <div class="p-10 overflow-y-auto">
+                <button id="closeSettings" class="absolute top-8 right-8 text-gray-300 hover:text-gray-600 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+
+                <h2 class="cute-font text-4xl text-pink-500 mb-10 text-center flex items-center justify-center gap-3">⚙️ 跑馬燈設定中心</h2>
+
+                <div class="mb-10 bg-gray-50 p-8 rounded-[2.5rem] border-2 border-gray-100">
+                    <label class="block text-gray-700 font-black mb-4 text-center text-lg">🔗 GAS Web App 網址設定</label>
+                    <div class="relative mb-4">
+                        <input type="text" id="configGasUrl" placeholder="https://script.google.com/macros/s/.../exec" 
+                            class="w-full px-6 py-4 bg-white border-4 border-gray-100 rounded-2xl outline-none focus:border-pink-300 transition-all text-sm text-center">
+                        <button onclick="toggleGasHelp('settingsGasHelp')" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-pink-500 bg-white rounded-full p-2 shadow-sm border border-gray-100">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </button>
+                    </div>
+
+                    <div id="settingsGasHelp" class="hidden text-left bg-white p-6 rounded-2xl mb-4 border border-gray-200 text-sm text-gray-600">
+                        <p class="font-bold text-pink-500 mb-2">🚀 如何設定 GAS：</p>
+                        <ol class="list-decimal pl-5 mb-4 space-y-1">
+                            <li>前往 <a href="https://script.google.com/" target="_blank" class="text-blue-500 underline">Google Apps Script</a> 建立新專案</li>
+                            <li>點擊下方按鈕複製程式碼，並貼上覆蓋預設的 <code>myFunction</code></li>
+                            <li>點擊右上角「部署」>「新部署」</li>
+                            <li>選取類型為「網頁應用程式」</li>
+                            <li>將「誰有權存取」設定為「任何人」</li>
+                            <li>部署完成後，複製「網頁應用程式網址」並貼回上方</li>
+                        </ol>
+                        <button onclick="copyGasCode(this)" class="w-full py-2 bg-pink-50 text-pink-500 border border-pink-100 rounded-xl font-bold hover:bg-pink-100 transition-all flex items-center justify-center gap-2">
+                            <span>📋 一鍵複製 GAS 程式碼</span>
+                        </button>
+                    </div>
+
+                    <div class="flex justify-center gap-4">
+                        <button id="clearLocalUrl" class="px-6 py-2 bg-white text-red-400 border-2 border-red-100 rounded-xl font-bold hover:bg-red-50 transition-all text-xs">清除本機網址設定</button>
+                    </div>
+                </div>
+
+                <div class="mb-10 bg-blue-50/60 p-8 rounded-[2.5rem] border-2 border-blue-100">
+                    <label class="block text-gray-700 font-black mb-5 text-center text-lg">🔗 短網址服務選擇</label>
+                    <div class="grid grid-cols-2 gap-3" id="shortenerBtns">
+                        <button onclick="setShortener('isgd')"  id="shortener-isgd"  class="shortener-btn active-shortener">🟢 is.gd <span class="text-[10px] text-gray-400 block">穩定、速度快（預設）</span></button>
+                        <button onclick="setShortener('vgd')"   id="shortener-vgd"   class="shortener-btn">🔵 v.gd <span class="text-[10px] text-gray-400 block">is.gd 備用網域</span></button>
+                        <button onclick="setShortener('ulvis')" id="shortener-ulvis" class="shortener-btn">🟡 ulvis.net <span class="text-[10px] text-gray-400 block">備用服務</span></button>
+                        <button onclick="setShortener('auto')"  id="shortener-auto"  class="shortener-btn">🔄 自動嘗試 <span class="text-[10px] text-gray-400 block">失敗自動切換備用</span></button>
+                    </div>
+                </div>
+
+                <div class="mb-12 text-center">
+                    <label class="block text-gray-700 font-black mb-6 text-lg tracking-widest uppercase">1. 展示模式切換</label>
+                    <div class="flex justify-center gap-8">
+                        <button onclick="setDisplayMode('marquee')" id="setting-btn-marquee" class="mode-btn">
+                            <span class="text-4xl mb-2">🏃‍♂️</span>
+                            <span class="font-bold text-gray-700">跑馬燈</span>
+                        </button>
+                        <button onclick="setDisplayMode('card')" id="setting-btn-card" class="mode-btn">
+                            <span class="text-4xl mb-2">🖼️</span>
+                            <span class="font-bold text-gray-700">圖卡牆</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10">
+                    <div class="bg-pink-50/50 p-6 rounded-[2rem] space-y-4">
+                        <label class="block text-gray-700 font-bold text-lg">📏 文字大小範圍 (px)</label>
+                        <div class="flex items-center gap-4">
+                            <span class="text-xs text-gray-400">最小</span>
+                            <input type="range" id="minFontSize" min="30" max="350" value="60" class="w-full accent-pink-500 cursor-pointer">
+                            <span id="minFontSizeVal" class="text-pink-500 font-mono font-bold w-12 text-right">60</span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="text-xs text-gray-400">最大</span>
+                            <input type="range" id="maxFontSize" min="30" max="350" value="120" class="w-full accent-pink-500 cursor-pointer">
+                            <span id="maxFontSizeVal" class="text-pink-500 font-mono font-bold w-12 text-right">120</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50/50 p-6 rounded-[2rem] space-y-4">
+                        <label class="block text-gray-700 font-bold text-lg">⚡ 顯示速度範圍 (秒)</label>
+                        <div class="flex items-center gap-4">
+                            <span class="text-xs text-gray-400">最快</span>
+                            <input type="range" id="minSpeed" min="2" max="40" value="8" class="w-full accent-blue-500 cursor-pointer">
+                            <span id="minSpeedVal" class="text-blue-500 font-mono font-bold w-12 text-right">8</span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="text-xs text-gray-400">最慢</span>
+                            <input type="range" id="maxSpeed" min="2" max="40" value="15" class="w-full accent-blue-500 cursor-pointer">
+                            <span id="maxSpeedVal" class="text-blue-500 font-mono font-bold w-12 text-right">15</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10">
+                    <div class="bg-gray-50/50 p-6 rounded-[2rem] space-y-4">
+                        <label class="block text-gray-700 font-bold text-lg">🔄 重複次數: <span id="repeatVal" class="text-pink-500 font-mono text-2xl">3</span>次</label>
+                        <input type="range" id="repeatCount" min="1" max="10" value="3" class="w-full accent-pink-500 cursor-pointer">
+                        <label class="block text-gray-700 font-bold mt-4">🎨 螢幕背景色：</label>
+                        <input type="color" id="bgColor" value="#ffffff" class="w-full h-12 rounded-2xl border-2 border-pink-50 cursor-pointer">
+                    </div>
+
+                    <div class="bg-pink-50/50 p-6 rounded-[2rem]">
+                        <label class="block text-gray-700 font-bold mb-4">🌈 隨機 5 色調色盤：</label>
+                        <div class="flex flex-wrap justify-center gap-3">
+                            <input type="color" id="color1" value="#ec4899" class="w-12 h-12 rounded-full border-2 border-white shadow cursor-pointer">
+                            <input type="color" id="color2" value="#3b82f6" class="w-12 h-12 rounded-full border-2 border-white shadow cursor-pointer">
+                            <input type="color" id="color3" value="#10b981" class="w-12 h-12 rounded-full border-2 border-white shadow cursor-pointer">
+                            <input type="color" id="color4" value="#f59e0b" class="w-12 h-12 rounded-full border-2 border-white shadow cursor-pointer">
+                            <input type="color" id="color5" value="#8b5cf6" class="w-12 h-12 rounded-full border-2 border-white shadow cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-8 bg-gray-50 border-t flex gap-4">
+                <button id="applySettings" class="flex-[2] bg-pink-500 hover:bg-pink-600 text-white py-5 rounded-3xl font-black shadow-xl transition-all text-xl flex items-center justify-center gap-2">儲存並套用設定 ✨</button>
+                <button id="clearData" class="flex-1 bg-white hover:bg-red-50 text-red-400 py-5 rounded-3xl font-bold border-2 border-red-50 text-sm">清空雲端</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * STREAMING_CHUNK:正在配置系統變數...
+         * ==============================================================================
+         * 🌟 重要設定：在此貼上您的 Google Apps Script (GAS) 網址 🌟
+         * ==============================================================================
+         */
+        const hardcodedGasUrl = ""; // <--- 直接在這裡貼上您的 GAS 網址
+
+        let config = {
+            gasUrl: "",
+            minFontSize: 60,
+            maxFontSize: 120,
+            minSpeed: 8,
+            maxSpeed: 15,
+            repeat: 3,
+            displayMode: 'marquee',
+            colors: ['#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'],
+            shortenerService: 'isgd',
+            isActive: false,
+            lastDataCount: 0,
+            fullData: []
+        };
+
+        const SHORTENERS = {
+            isgd:   { label: 'is.gd',      badge: '🟢', desc: '穩定、速度快（預設）' },
+            vgd:    { label: 'v.gd',        badge: '🔵', desc: 'is.gd 備用網域' },
+            ulvis:  { label: 'ulvis.net',   badge: '🟡', desc: '備用服務' },
+            auto:   { label: '自動（依序嘗試）', badge: '🔄', desc: '失敗自動切換備用' }
+        };
+
+        const gasCode = `function getSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("跑馬燈資料");
+  if (!sheet) {
+    sheet = ss.insertSheet("跑馬燈資料");
+    sheet.appendRow(["時間", "內容"]);
+    sheet.getRange("1:1").setFontWeight("bold").setBackground("#ffe4e6");
+  }
+  return sheet;
+}
+
+function doGet(e) {
+  const sheet = getSheet();
+  const data = sheet.getDataRange().getValues();
+  data.shift(); // 移除標題
+  const result = data.map(row => ({ "時間": row[0], "內容": row[1] }));
+  
+  const callback = e.parameter.callback;
+  const json = JSON.stringify(result);
+  if (callback) {
+    return ContentService.createTextOutput(callback + "(" + json + ")")
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  const sheet = getSheet();
+  const params = JSON.parse(e.postData.contents);
+  
+  if (params.action === "clear") {
+    if (sheet.getLastRow() > 1) {
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).clearContent();
+    }
+    return ContentService.createTextOutput("cleared");
+  }
+
+  sheet.appendRow([new Date(), params.content]);
+  return ContentService.createTextOutput("success");
+}`;
+
+        function toggleGasHelp(id) {
+            const el = document.getElementById(id);
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+
+        function copyGasCode(btn) {
+            navigator.clipboard.writeText(gasCode).then(() => {
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = "<span>✅ 已複製到剪貼簿！</span>";
+                btn.classList.add('bg-green-50', 'text-green-600', 'border-green-200');
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                    btn.classList.remove('bg-green-50', 'text-green-600', 'border-green-200');
+                }, 2000);
+            }).catch(err => {
+                alert("複製失敗，請手動選取複製");
+            });
+        }
+
+        const els = {
+            displayContainer: document.getElementById('displayContainer'),
+            quickStartZone: document.getElementById('quickStartZone'),
+            quickGasUrl: document.getElementById('quickGasUrl'),
+            configGasUrl: document.getElementById('configGasUrl'),
+            settingsModal: document.getElementById('settingsModal'),
+            shareModal: document.getElementById('shareModal'),
+            modeBadge: document.getElementById('modeBadge'),
+            applyBtn: document.getElementById('applySettings'),
+            sendBtn: document.getElementById('sendBtn'),
+            sendText: document.getElementById('sendText'),
+            sendLoader: document.getElementById('sendLoader'),
+            studentInput: document.getElementById('studentInput'),
+            openShare: document.getElementById('openShare'),
+            closeShare: document.getElementById('closeShare'),
+            openSettings: document.getElementById('openSettings'),
+            closeSettings: document.getElementById('closeSettings')
+        };
+
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const gasFromUrl = urlParams.get('gasurl');
+
+            // 讀取優先級：URL 參數 > 硬編碼 > 本機存儲
+            config.gasUrl = gasFromUrl || hardcodedGasUrl || localStorage.getItem('marquee_gas_url_v8') || '';
+
+            if (config.gasUrl) {
+                els.quickStartZone.classList.add('hidden');
+                els.configGasUrl.value = config.gasUrl;
+                if (gasFromUrl) localStorage.setItem('marquee_gas_url_v8', gasFromUrl);
+                setTimeout(() => toggleSync(true), 1000);
+            }
+
+            // 還原短網址服務偏好
+            const savedShortener = localStorage.getItem('marquee_shortener_v1') || 'isgd';
+            setShortener(savedShortener);
+
+            setupInstantValueListeners();
+            syncStyles(false);
+        };
+
+        /**
+         * STREAMING_CHUNK:正在定義拉桿監聽器...
+         */
+        function setupInstantValueListeners() {
+            const listeners = [
+                { id: 'minFontSize', val: 'minFontSizeVal' },
+                { id: 'maxFontSize', val: 'maxFontSizeVal' },
+                { id: 'minSpeed', val: 'minSpeedVal' },
+                { id: 'maxSpeed', val: 'maxSpeedVal' },
+                { id: 'repeatCount', val: 'repeatVal' }
+            ];
+
+            listeners.forEach(item => {
+                const el = document.getElementById(item.id);
+                const valEl = document.getElementById(item.val);
+                if (el && valEl) {
+                    el.addEventListener('input', () => {
+                        valEl.innerText = el.value;
+                    });
+                }
+            });
+        }
+
+        /**
+         * STREAMING_CHUNK:正在定義分享功能...
+         */
+        async function generateShareInfo() {
+            if (!config.gasUrl) {
+                alert("請先設定 GAS 網址才能分享唷！");
+                return;
+            }
+
+            const baseUrl = window.location.origin + window.location.pathname;
+            const fullUrl = `${baseUrl}?gasurl=${encodeURIComponent(config.gasUrl)}`;
+
+            // 顯示完整連結與 QR Code
+            document.getElementById('displayFullUrl').innerText = "原始網址: " + fullUrl;
+            const qrFullUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(fullUrl)}`;
+            document.getElementById('qrcode-full').innerHTML = `<img src="${qrFullUrl}" alt="Full QR" class="w-32 h-32 mx-auto">`;
+
+            document.getElementById('copyFullLink').onclick = () => {
+                copyToClipboard(fullUrl);
+                alert("已複製完整網址！");
+            };
+
+            els.shareModal.classList.remove('hidden');
+
+            // --- TinyURL 區塊：全自動生成 ---
+            const qrTinyBox = document.getElementById('qrcode-tiny');
+            const displayTiny = document.getElementById('displayTinyUrl');
+            const copyTinyBtn = document.getElementById('copyTinyLink');
+
+            // 顯示載入中
+            qrTinyBox.innerHTML = `
+                <div class="flex flex-col items-center justify-center gap-2 min-h-[150px]">
+                    <svg class="animate-spin h-8 w-8 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-blue-300 text-xs italic">自動生成短網址中...</span>
+                </div>
+            `;
+            displayTiny.innerText = "";
+            copyTinyBtn.onclick = null;
+
+            // 嘗試多個支援 CORS 的短網址服務（依序嘗試）
+            const shortUrl = await tryShorteners(fullUrl);
+
+            if (shortUrl) {
+                displayTiny.innerText = "短網址: " + shortUrl;
+                const qrTinyUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(shortUrl)}`;
+                qrTinyBox.innerHTML = `<img src="${qrTinyUrl}" alt="Tiny QR" class="w-32 h-32 mx-auto" onload="this.style.opacity=1" style="opacity:0;transition:opacity 0.3s">`;
+                qrTinyBox.querySelector('img').addEventListener('load', function(){ this.style.opacity = 1; });
+                copyTinyBtn.onclick = () => {
+                    copyToClipboard(shortUrl);
+                    alert("已複製短網址！");
+                };
+            } else {
+                // 所有服務都失敗時，優雅降級為手動模式
+                qrTinyBox.innerHTML = `
+                    <div class="flex flex-col items-center gap-2 w-full px-2">
+                        <span class="text-[10px] text-red-400 font-bold">自動生成失敗，請手動建立</span>
+                        <button id="manualFallbackBtn" class="w-full py-2 bg-blue-500 text-white rounded-2xl hover:bg-blue-600 transition-all font-bold shadow-md text-xs">開啟 TinyURL 網站 ✨</button>
+                        <input type="text" id="manualTinyInput" placeholder="在此貼上產生的短網址..." class="w-full text-xs p-2 border-2 border-blue-100 rounded-xl text-center outline-none focus:border-blue-400 bg-gray-50/50">
+                    </div>
+                `;
+                document.getElementById('manualFallbackBtn').onclick = () => {
+                    window.open(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(fullUrl)}`, '_blank');
+                };
+                document.getElementById('manualTinyInput').addEventListener('input', (e) => {
+                    const val = e.target.value.trim();
+                    if (val.startsWith('http')) {
+                        displayTiny.innerText = "短網址: " + val;
+                        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(val)}`;
+                        qrTinyBox.innerHTML = `<img src="${qrUrl}" alt="Tiny QR" class="w-32 h-32 mx-auto">`;
+                        copyTinyBtn.onclick = () => { copyToClipboard(val); alert("已複製短網址！"); };
+                    }
+                });
+            }
+        }
+
+        // 設定短網址服務
+        function setShortener(key) {
+            config.shortenerService = key;
+            localStorage.setItem('marquee_shortener_v1', key);
+            document.querySelectorAll('.shortener-btn').forEach(btn => btn.classList.remove('active-shortener'));
+            const target = document.getElementById(`shortener-${key}`);
+            if (target) target.classList.add('active-shortener');
+        }
+
+        // 呼叫指定的短網址服務
+        async function callShortener(service, longUrl) {
+            if (service === 'isgd') {
+                const res = await fetch(`https://is.gd/create.php?format=json&url=${encodeURIComponent(longUrl)}`);
+                if (!res.ok) throw new Error('is.gd failed');
+                const data = await res.json();
+                if (!data.shorturl) throw new Error('is.gd no result');
+                return data.shorturl;
+            }
+            if (service === 'vgd') {
+                const res = await fetch(`https://v.gd/create.php?format=json&url=${encodeURIComponent(longUrl)}`);
+                if (!res.ok) throw new Error('v.gd failed');
+                const data = await res.json();
+                if (!data.shorturl) throw new Error('v.gd no result');
+                return data.shorturl;
+            }
+            if (service === 'ulvis') {
+                const res = await fetch(`https://ulvis.net/api.php?url=${encodeURIComponent(longUrl)}&private=1`);
+                if (!res.ok) throw new Error('ulvis failed');
+                const text = (await res.text()).trim();
+                if (!text.startsWith('http')) throw new Error('ulvis bad response');
+                return text;
+            }
+            throw new Error('unknown service');
+        }
+
+        // 依序嘗試多個支援 CORS 的短網址服務
+        async function tryShorteners(longUrl) {
+            const chosen = config.shortenerService || 'isgd';
+
+            if (chosen !== 'auto') {
+                // 指定服務：直接呼叫，失敗才回傳 null
+                try { return await callShortener(chosen, longUrl); } catch(e) { return null; }
+            }
+
+            // 自動模式：依序嘗試全部服務
+            for (const svc of ['isgd', 'vgd', 'ulvis']) {
+                try { return await callShortener(svc, longUrl); } catch(e) { /* 繼續 */ }
+            }
+            return null;
+        }
+
+        function copyToClipboard(text) {
+            const dummy = document.createElement('textarea');
+            document.body.appendChild(dummy);
+            dummy.value = text;
+            dummy.select();
+            document.execCommand('copy');
+            document.body.removeChild(dummy);
+        }
+
+        /**
+         * STREAMING_CHUNK:正在定義顯示模式與同步邏輯...
+         */
+        function setDisplayMode(mode) {
+            config.displayMode = mode;
+            els.modeBadge.innerText = `模式：${mode === 'marquee' ? '跑馬燈' : '圖卡牆'}`;
+            
+            const modes = ['marquee', 'card'];
+            modes.forEach(m => {
+                const b1 = document.getElementById(`start-btn-${m}`);
+                const b2 = document.getElementById(`setting-btn-${m}`);
+                if (b1) b1.className = (mode === m) ? 'mode-btn active' : 'mode-btn';
+                if (b2) b2.className = (mode === m) ? 'mode-btn active' : 'mode-btn';
+            });
+            
+            renderAllData(); 
+        }
+
+        function syncStyles(showFeedback = true) {
+            config.gasUrl = els.configGasUrl.value.trim() || hardcodedGasUrl;
+            if (els.configGasUrl.value.trim()) {
+                localStorage.setItem('marquee_gas_url_v8', config.gasUrl);
+            }
+
+            config.minFontSize = parseInt(document.getElementById('minFontSize').value);
+            config.maxFontSize = parseInt(document.getElementById('maxFontSize').value);
+            config.minSpeed = parseInt(document.getElementById('minSpeed').value);
+            config.maxSpeed = parseInt(document.getElementById('maxSpeed').value);
+            config.repeat = document.getElementById('repeatCount').value;
+            config.colors = [
+                document.getElementById('color1').value, document.getElementById('color2').value,
+                document.getElementById('color3').value, document.getElementById('color4').value,
+                document.getElementById('color5').value
+            ];
+            
+            document.body.style.backgroundColor = document.getElementById('bgColor').value;
+
+            if (showFeedback) {
+                const originalText = els.applyBtn.innerText;
+                els.applyBtn.innerText = "已成功套用！ ✨";
+                setTimeout(() => { 
+                    els.applyBtn.innerText = originalText; 
+                    els.settingsModal.classList.add('hidden'); 
+                }, 800);
+                renderAllData(); 
+            }
+        }
+
+        function renderAllData() {
+            if (config.displayMode === 'card') {
+                els.displayContainer.innerHTML = '';
+                const grid = document.createElement('div');
+                grid.className = 'card-grid-container';
+                config.fullData.forEach(item => {
+                    const card = createCardElement(item["內容"]);
+                    grid.appendChild(card);
+                });
+                els.displayContainer.appendChild(grid);
+            } else {
+                els.displayContainer.innerHTML = '';
+                config.lastDataCount = 0; 
+            }
+        }
+
+        function startFetchingLoop() {
+            if (!config.isActive) return;
+            const script = document.createElement('script');
+            script.src = `${config.gasUrl}?callback=processData&t=${Date.now()}`;
+            script.onerror = () => { updateStatus(false); if(config.isActive) setTimeout(startFetchingLoop, 5000); };
+            document.body.appendChild(script);
+            setTimeout(() => script.remove(), 2000);
+        }
+
+        window.processData = function(data) {
+            updateStatus(true);
+            if (!data || !Array.isArray(data)) return;
+            config.fullData = data;
+
+            if (data.length > config.lastDataCount) {
+                const newItems = data.slice(config.lastDataCount);
+                if (config.displayMode === 'marquee') {
+                    newItems.forEach((item, index) => {
+                        setTimeout(() => createMarqueeItem(item["內容"]), index * 800);
+                    });
+                } else {
+                    renderAllData(); 
+                }
+                config.lastDataCount = data.length;
+            }
+            if (config.isActive) setTimeout(startFetchingLoop, 3000);
+        };
+
+        function getRandomInt(min, max) {
+            min = parseInt(min); max = parseInt(max);
+            if (min > max) [min, max] = [max, min];
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function getRandomColor() {
+            return config.colors[Math.floor(Math.random() * config.colors.length)];
+        }
+
+        function createMarqueeItem(text) {
+            if (!text) return;
+            const div = document.createElement('div');
+            div.className = 'marquee-item cute-font';
+            div.innerText = text;
+            const size = getRandomInt(config.minFontSize, config.maxFontSize);
+            const speed = getRandomInt(config.minSpeed, config.maxSpeed);
+            div.style.fontSize = size + 'px';
+            div.style.color = getRandomColor();
+            div.style.top = (Math.random() * (window.innerHeight - size - 100)) + 50 + 'px';
+            div.style.animation = `marquee ${speed}s linear ${config.repeat}`;
+            els.displayContainer.appendChild(div);
+            div.addEventListener('animationend', () => div.remove());
+        }
+
+        function createCardElement(text) {
+            const div = document.createElement('div');
+            div.className = 'card-item cute-font';
+            div.innerText = text;
+            div.style.fontSize = Math.min(config.maxFontSize / 1.5, 48) + 'px';
+            div.style.color = getRandomColor();
+            return div;
+        }
+
+        function toggleSync(start) {
+            config.isActive = start;
+            if (config.isActive && config.gasUrl) startFetchingLoop();
+        }
+
+        function activateFromQuickStart() {
+            const url = els.quickGasUrl.value.trim();
+            if (!url.includes('/exec')) {
+                alert("網址格式錯誤，請確保結尾是 /exec");
+                return;
+            }
+            config.gasUrl = url;
+            els.configGasUrl.value = url;
+            localStorage.setItem('marquee_gas_url_v8', url);
+            els.quickStartZone.classList.add('hidden');
+            toggleSync(true);
+        }
+
+        function switchView(v) {
+            document.getElementById('teacherView').classList.toggle('hidden', v === 'student');
+            document.getElementById('studentView').classList.toggle('hidden', v === 'teacher');
+            els.settingsModal.classList.add('hidden');
+        }
+
+        function updateStatus(connected) {
+            const wrap = document.getElementById('connStatus');
+            wrap.style.opacity = "1";
+            document.getElementById('statusDot').className = connected ? 'relative inline-flex rounded-full h-3 w-3 bg-green-500' : 'relative inline-flex rounded-full h-3 w-3 bg-red-400';
+            document.getElementById('statusLabel').innerText = connected ? 'CONNECTED' : 'OFFLINE';
+        }
+
+        /**
+         * STREAMING_CHUNK:正在綁定事件監聽器...
+         */
+        els.sendBtn.onclick = async () => {
+            const content = els.studentInput.value.trim();
+            if (!content || !config.gasUrl) return;
+            els.sendBtn.disabled = true;
+            els.sendText.innerText = "傳送中...";
+            els.sendLoader.classList.remove('hidden');
+            try {
+                await fetch(config.gasUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: "send", content }) });
+                setTimeout(() => {
+                    els.studentInput.value = "";
+                    els.sendText.innerText = "成功送出！ ✨";
+                    els.sendLoader.classList.add('hidden');
+                    document.getElementById('sendStatus').innerText = "送出成功！ 🚀";
+                    setTimeout(() => {
+                        els.sendBtn.disabled = false;
+                        els.sendText.innerText = "送出到螢幕 ✨";
+                        document.getElementById('sendStatus').innerText = "";
+                    }, 1500);
+                }, 500);
+            } catch(e) {
+                els.sendBtn.disabled = false;
+                els.sendText.innerText = "送出到螢幕 ✨";
+                els.sendLoader.classList.add('hidden');
+            }
+        };
+
+        // 綁定按鈕與事件
+        if(els.openSettings) els.openSettings.onclick = () => els.settingsModal.classList.remove('hidden');
+        if(els.closeSettings) els.closeSettings.onclick = () => els.settingsModal.classList.add('hidden');
+        if(els.openShare) els.openShare.onclick = generateShareInfo;
+        if(els.closeShare) els.closeShare.onclick = () => els.shareModal.classList.add('hidden');
+        
+        const clearLocalBtn = document.getElementById('clearLocalUrl');
+        if(clearLocalBtn) clearLocalBtn.onclick = () => { 
+            if(confirm("確定要清除本機存儲的網址嗎？")) { 
+                localStorage.removeItem('marquee_gas_url_v8'); 
+                location.reload(); 
+            } 
+        };
+
+        if(els.applyBtn) els.applyBtn.onclick = () => syncStyles(true);
+
+        const clearDataBtn = document.getElementById('clearData');
+        if(clearDataBtn) clearDataBtn.onclick = async () => {
+            const originalText = clearDataBtn.innerText;
+            if (!confirm("確定要清空雲端資料嗎？")) return;
+            clearDataBtn.innerText = "清理中...";
+            await fetch(config.gasUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: "clear" }) });
+            config.fullData = []; config.lastDataCount = 0; renderAllData();
+            clearDataBtn.innerText = "清理完成！";
+            setTimeout(() => { clearDataBtn.innerText = originalText; }, 2000);
+        };
+    </script>
+</body>
+</html>
