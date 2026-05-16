@@ -185,7 +185,7 @@
                 </span>
             </button>
             <p id="sendStatus" class="mt-4 text-pink-500 font-bold h-6"></p>
-            <button onclick="switchView('teacher')" class="mt-10 text-gray-300 underline italic text-sm">返回大螢幕</button>
+            <button onclick="goToTeacherView()" class="mt-10 text-gray-300 underline italic text-sm">返回大螢幕</button>
         </div>
     </div>
 
@@ -459,23 +459,36 @@ function doPost(e) {
         window.onload = () => {
             const urlParams = new URLSearchParams(window.location.search);
             const gasFromUrl = urlParams.get('gasurl');
+            // mode=teacher 才進教師跑馬燈畫面；預設（無參數）直接開學生發文介面
+            const mode = urlParams.get('mode');
 
             // 讀取優先級：URL 參數 > 硬編碼 > 本機存儲
             config.gasUrl = gasFromUrl || hardcodedGasUrl || localStorage.getItem('marquee_gas_url_v8') || '';
 
-            if (config.gasUrl) {
-                els.quickStartZone.classList.add('hidden');
-                els.configGasUrl.value = config.gasUrl;
+            if (mode === 'teacher') {
+                // ── 教師模式（原有行為）──────────────────────
+                if (config.gasUrl) {
+                    els.quickStartZone.classList.add('hidden');
+                    els.configGasUrl.value = config.gasUrl;
+                    if (gasFromUrl) localStorage.setItem('marquee_gas_url_v8', gasFromUrl);
+                    setTimeout(() => toggleSync(true), 1000);
+                }
+                // 還原短網址服務偏好
+                const savedShortener = localStorage.getItem('marquee_shortener_v1') || 'isgd';
+                setShortener(savedShortener);
+                setupInstantValueListeners();
+                syncStyles(false);
+            } else {
+                // ── 學生模式（預設）：直接顯示發文畫層 ─────────
+                document.getElementById('teacherView').classList.add('hidden');
+                document.getElementById('studentView').classList.remove('hidden');
                 if (gasFromUrl) localStorage.setItem('marquee_gas_url_v8', gasFromUrl);
-                setTimeout(() => toggleSync(true), 1000);
+                // 若無 GAS 網址，提示使用者
+                if (!config.gasUrl) {
+                    document.getElementById('sendStatus').innerText = '⚠️ 尚未設定 GAS 網址，無法送出';
+                    els.sendBtn.disabled = true;
+                }
             }
-
-            // 還原短網址服務偏好
-            const savedShortener = localStorage.getItem('marquee_shortener_v1') || 'isgd';
-            setShortener(savedShortener);
-
-            setupInstantValueListeners();
-            syncStyles(false);
         };
 
         /**
@@ -787,6 +800,13 @@ function doPost(e) {
             document.getElementById('teacherView').classList.toggle('hidden', v === 'student');
             document.getElementById('studentView').classList.toggle('hidden', v === 'teacher');
             els.settingsModal.classList.add('hidden');
+        }
+
+        function goToTeacherView() {
+            // 保留現有 URL 參數（含 gasurl），加上 mode=teacher
+            const params = new URLSearchParams(window.location.search);
+            params.set('mode', 'teacher');
+            window.location.href = window.location.pathname + '?' + params.toString();
         }
 
         function updateStatus(connected) {
