@@ -23,62 +23,39 @@
 
 ## 🚀 使用說明
 
-### 1. 設定 Google Apps Script (GAS) 後端
+為了讓跑馬燈運作，您需要先完成 **Google Apps Script (GAS)** 的後端設定。
 
-您需要建立一個 Google Apps Script 作為資料中繼站：
+### 1. 取得並部署 GAS 後端
 
-1. 前往 [Google Apps Script](https://script.google.com/) 並建立新專案。
-2. 貼入下方的 GAS 程式碼並存檔：
-   ```javascript
-   function getSheet() {
-     const ss = SpreadsheetApp.getActiveSpreadsheet();
-     let sheet = ss.getSheetByName("跑馬燈資料");
-     if (!sheet) {
-       sheet = ss.insertSheet("跑馬燈資料");
-       sheet.appendRow(["時間", "內容"]);
-       sheet.getRange("1:1").setFontWeight("bold").setBackground("#ffe4e6");
-     }
-     return sheet;
-   }
+1. **開啟擴充功能**：點擊 Chrome 工具列上的「可愛網頁跑馬燈」圖示。
+2. **複製程式碼**：在「GAS Web App 網址」欄位旁邊點擊 **「❓」說明按鈕**，然後點擊 **「📋 複製 GAS 程式碼」**。
+3. **建立 Google 試算表**：前往 [Google 雲端硬碟](https://drive.google.com/)，建立一個新的「Google 試算表」。
+4. **開啟指令碼編輯器**：在試算表中，點擊選單的「**擴充功能**」 > 「**Apps Script**」。
+5. **貼上程式碼**：刪除編輯器中原本的所有程式碼，並貼上剛才從擴充功能複製的內容，按下存檔。
+6. **部署網頁應用程式**：
+   - 點擊右上角的「**部署**」 > 「**新部署**」。
+   - 類型選擇「**網頁應用程式**」。
+   - 「誰有權存取」務必選擇「**任何人**」。
+   - 點擊部署，並複製產生的「**網頁應用程式 URL**」。
 
-   function doGet(e) {
-     const sheet = getSheet();
-     const data = sheet.getDataRange().getValues();
-     data.shift(); // 移除標題
-     const result = data.map(row => ({ "時間": row[0], "內容": row[1] }));
-     
-     const json = JSON.stringify(result);
-     return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
-   }
+### 2. 設定擴充功能與啟動
 
-   function doPost(e) {
-     const sheet = getSheet();
-     const params = JSON.parse(e.postData.contents);
-     
-     if (params.action === "clear") {
-       if (sheet.getLastRow() > 1) {
-         sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).clearContent();
-       }
-       return ContentService.createTextOutput("cleared");
-     }
+1. **填回網址**：回到 Chrome 擴充功能視窗，將剛才複製的網址貼入「**GAS Web App 網址**」輸入框中。
+2. **啟用功能**：勾選「**啟用跑馬燈功能**」。
+3. **儲存設定**：點擊下方的 **「儲存並套用 ✨」**。
+4. **開啟跑馬燈**：重新整理您想要顯示跑馬燈的網頁。
 
-     sheet.appendRow([new Date(), params.content]);
-     return ContentService.createTextOutput("success");
-   }
-   ```
-3. 點擊「**部署**」 > 「**新部署**」。
-4. 類型選擇「**網頁應用程式**」。
-5. 「誰有權存取」務必選擇「**任何人**」。
-6. 部署後，複製產生的「**網頁應用程式 URL**」。
+### 3. 開放訪客發文 (QR Code 分享)
 
-### 2. 設定擴充功能
+1. **開啟發文網頁**：在擴充功能選單中，點擊 **「開啟訪客發文網址 ✨」** 按鈕。
+2. **獲取 QR Code**：在彈出的新網頁中，點擊左上角的 **QR Code 圖示**，畫面上會顯示專屬的分享 QR Code。
 
-1. 點擊 Chrome 工具列上的「可愛網頁跑馬燈」圖示。
-2. 在「**GAS Web App 網址**」欄位貼上剛才複製的網址。
-3. 勾選「**啟用跑馬燈功能**」。
-4. 根據喜好調整文字大小、速度、重複次數與顏色。
-5. 點擊「**儲存並套用 ✨**」。
-6. 重新整理您想要顯示跑馬燈的網頁，即可看到效果！
+   > 💡 **為什麼要讓大家掃這個 QR Code？**
+   > 因為這個 QR Code 產生的網址已經「自動填好」了您的後台設定（GAS 網址）。參與者（如學生或觀眾）掃描後，**完全不需要手動貼上任何複雜的網址**，直接輸入內容就能發送。這讓大家省去設定的麻煩，拿起手機就能馬上互動！
+
+3. **開始互動**：
+   - 讓使用者（學生或觀眾）掃描該 QR Code，即可在手機或裝置上輸入文字。
+   - 只要您的瀏覽器已啟用跑馬燈功能，訪客送出的文字就會即時以可愛跑馬燈的形式出現在您當前瀏覽的網頁上。
 
 ## 🎨 授權資訊
 
