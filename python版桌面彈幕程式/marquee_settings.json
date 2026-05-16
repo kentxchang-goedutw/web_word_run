@@ -1,0 +1,16 @@
+{
+  "isActive": true,
+  "gasUrl": "https://script.google.com/macros/s/AKfycbzKSBQUzLOJPa5XQDs57Kpt8TAB7h5YvzaEQ2aPuZjdpSlV4lEidJ-bNfabyAthlMDu_Q/exec",
+  "minFontSize": 20,
+  "maxFontSize": 20,
+  "minSpeed": 8,
+  "maxSpeed": 13,
+  "repeatCount": 1,
+  "colors": [
+    "#ec4899",
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#8b5cf6"
+  ]
+}
