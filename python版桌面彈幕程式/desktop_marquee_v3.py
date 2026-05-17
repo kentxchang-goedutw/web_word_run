@@ -33,8 +33,10 @@ from PyQt6.QtGui import (
 import requests
 
 # ── 常數 ──────────────────────────────────────────────────
-SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                             "marquee_settings.json")
+# 打包成 exe 後 __file__ 指向暫存目錄，改用 exe 本身所在目錄
+_BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) \
+            else os.path.dirname(os.path.abspath(__file__))
+SETTINGS_FILE = os.path.join(_BASE_DIR, "marquee_settings.json")
 FPS      = 30
 FRAME_MS = 1000 // FPS
 POST_URL_BASE = "https://kentxchang-goedutw.github.io/web_word_run/"
